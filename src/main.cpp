@@ -27,7 +27,9 @@ enum class KV_PAIR_VALUE : int8_t {
     STRING,
     ARRAY
 };
-inline static const std::map<KV_PAIR_VALUE, std::string_view> KV_PAIR_VALUE_STR = {
+inline static const std::map<KV_PAIR_VALUE, std::string_view> 
+KV_PAIR_VALUE_STR = 
+{
     { KV_PAIR_VALUE::ERR,    "ERR"    },
     { KV_PAIR_VALUE::BOOL,   "BOOL"   },
     { KV_PAIR_VALUE::INT,    "INT"    },
@@ -42,14 +44,14 @@ namespace kv {
 struct value {
     using self_type = value;
 
-    value() 
+    constexpr value() 
         : type(KV_PAIR_VALUE::ERR),
           v(-1LL)
     {
           
     }
 
-    ~value() {
+    constexpr ~value() {
 
     }
 
@@ -97,9 +99,9 @@ struct value {
         std::intmax_t si;
         long double f;
 
-        value_union() : value_union(-1LL) { }
-        value_union(std::intmax_t i) : si(i) { }
-        ~value_union() { }
+        constexpr value_union() : value_union(-1LL) { }
+        constexpr value_union(std::intmax_t i) : si(i) { }
+        constexpr ~value_union() { }
     } v;
     // non-trivial types declared separately
     std::string s;
@@ -127,6 +129,7 @@ struct pair {
 struct section {
     section() : section(nullptr) { }
     section(section* p) : parent(std::shared_ptr<section>(p)) { }
+    ~section() { parent.reset(); }
 
     std::string name;
     std::shared_ptr<section> parent;
@@ -152,7 +155,8 @@ template<class CharT> struct fmt::formatter<kv::value, CharT> :
         else if (v.type == KV_PAIR_VALUE::STRING)
             return fmt::format_to(fc.out(), "{}", v.s);
         else if (v.type == KV_PAIR_VALUE::ARRAY)
-            throw std::invalid_argument("array formatting not yet implemented.");
+            throw std::invalid_argument(
+                "array formatting not yet implemented.");
         throw std::invalid_argument("cannot format invalid type.");
     }
 };
@@ -162,7 +166,11 @@ template<class CharT> struct fmt::formatter<kv::pair, CharT> :
 {
     template<typename FormatContext>
     auto format(kv::pair kv, FormatContext& fc) {
-        return fmt::format_to(fc.out(), "key=\"{}\"\nvalue=\"{}\" (t={})", kv.key, kv.val, KV_PAIR_VALUE_STR.at(kv.val.type));
+        return fmt::format_to(fc.out(), 
+                              "key=\"{}\"\nvalue=\"{}\" (t={})", 
+                              kv.key, 
+                              kv.val, 
+                              KV_PAIR_VALUE_STR.at(kv.val.type));
     }
 };
 
@@ -192,112 +200,6 @@ NO_DISCARD std::stringstream strip_comments(std::ifstream& f) {
     return ss;
 }
 
-NO_DISCARD constexpr std::string_view remove_leading_and_trailing_whitespace(std::string_view s) {
-    const std::size_t first_nonwhitespace = s.find_first_not_of(" \n");
-    const std::size_t last_nonwhitespace = s.find_last_not_of(" \n");
-    return s.substr(first_nonwhitespace, last_nonwhitespace - first_nonwhitespace + 1);
-}
-
-NO_DISCARD constexpr std::string remove_leading_and_trailing_whitespace(const std::string& s) {
-    const std::size_t first_nonwhitespace = s.find_first_not_of(" \n");
-    const std::size_t last_nonwhitespace = s.find_last_not_of(" \n");
-    return s.substr(first_nonwhitespace, last_nonwhitespace - first_nonwhitespace + 1);
-}
-
-NO_DISCARD constexpr std::string_view remove_sign_prefix(std::string_view s) {
-    if (s.starts_with('+') || s.starts_with('-'))
-        s = s.substr(1);
-
-    return s;
-}
-
-
-NO_DISCARD constexpr bool LINE_IS_WHITESPACE(std::string_view s) noexcept {
-    return s.find_first_not_of(" \n") == std::string::npos;
-}
-
-NO_DISCARD constexpr bool STRING_HAS_HEX_PREFIX_OR_POSTFIX(std::string_view s) noexcept;
-NO_DISCARD std::string_view remove_hex_prefix_or_postfix(std::string_view s) {
-    s = remove_sign_prefix(remove_leading_and_trailing_whitespace(s));
-
-    if (s.starts_with("0x"))
-        s = s.substr(2);
-
-    if (s.ends_with('h'))
-        s = s.substr(0, s.size() - 1);
-
-    return s;
-}
-
-NO_DISCARD std::string_view remove_octal_prefix_or_postfix(std::string_view s) {
-    s = remove_sign_prefix(remove_leading_and_trailing_whitespace(s));
-
-    if (STRING_HAS_HEX_PREFIX_OR_POSTFIX(s))
-        throw std::runtime_error("string is hex, not octal.");
-
-    if (s.starts_with('o'))
-        s = s.substr(1);
-
-    if (s.starts_with('0'))
-        s = s.substr(1);
-
-    if (s.ends_with('o'))
-        s = s.substr(0, s.size() - 1);
-
-    return s;
-}
-
-NO_DISCARD constexpr bool LINE_CONTAINS_SECTION_HEADER(std::string_view s) noexcept {
-    return s.find('[') != std::string::npos &&
-        s.find(']', s.find('[')) != std::string::npos;
-}
-
-NO_DISCARD constexpr bool STRING_CONTAINS_WHITESPACE(std::string_view s) noexcept {
-    return s.find_first_of(" \n") != std::string::npos;
-}
-
-NO_DISCARD constexpr bool STRING_HAS_SIGN_PREFIX(std::string_view s) noexcept {
-    s = remove_leading_and_trailing_whitespace(s);
-    return s.starts_with('-') || s.starts_with('+');
-}
-
-NO_DISCARD constexpr bool STRING_IS_NUMERIC(std::string_view s) noexcept {
-    std::string_view search = "0123456789abcdef,_.'+-";
-    for (const auto c : s) {
-        if (search.find(static_cast<std::string::value_type>(std::tolower(c))) == std::string::npos)
-            return false;
-    }
-    return true;
-}
-
-NO_DISCARD constexpr bool STRING_HAS_HEX_PREFIX_OR_POSTFIX(std::string_view s) noexcept {
-    s = remove_sign_prefix(remove_leading_and_trailing_whitespace(s));
-    if (!STRING_IS_NUMERIC(s))
-        return false;
-
-    bool is_hex = false;
-    if (s.ends_with('h'))
-        is_hex = true;
-
-    else if (s.starts_with("0x"))
-        is_hex = true;
-
-    return is_hex;
-}
-
-NO_DISCARD constexpr bool STRING_HAS_OCTAL_PREFIX_OR_POSTFIX(std::string_view s) noexcept {
-    s = remove_sign_prefix(remove_leading_and_trailing_whitespace(s));
-
-    if (!STRING_IS_NUMERIC(s))
-        return false;
-
-    bool is_octal = false;
-    if (s.ends_with('o') || s.starts_with('o') || s.starts_with('0'))
-        is_octal = true;
-
-    return is_octal;
-}
-
 NO_DISCARD constexpr bool LINE_CONTAINS_KV(std::string_view s) noexcept {
     return s.find('=') != std::string::npos;
 }
@@ -307,7 +209,7 @@ KV_STRING_CONTAINS_INVALID_WHITESPACE(std::string_view s) noexcept {
     if (ERROR(LINE_CONTAINS_KV(s)))
         return -1;
 
-    s = remove_leading_and_trailing_whitespace(s);
+    s = util::parse::remove_leading_and_trailing_whitespace(s);
 
     const std::size_t eq_pos = s.find('=');
 
@@ -315,7 +217,7 @@ KV_STRING_CONTAINS_INVALID_WHITESPACE(std::string_view s) noexcept {
 
     const std::size_t key_end = s.find_first_of(" =");
     std::string_view k = s.substr(0, key_end);
-    if (STRING_CONTAINS_WHITESPACE(k))
+    if (util::parse::STRING_CONTAINS_WHITESPACE(k))
         return -2;
 
     const std::size_t value_begin = s.find_first_not_of(" \n", eq_pos + 1);
@@ -349,74 +251,92 @@ KV_STRING_CONTAINS_INVALID_WHITESPACE(std::string_view s) noexcept {
     return 0;
 }
 
+NO_DISCARD constexpr bool LINE_IS_WHITESPACE(std::string_view s) noexcept {
+    return s.find_first_not_of(" \n") == std::string::npos;
+}
+
+NO_DISCARD constexpr bool 
+LINE_CONTAINS_SECTION_HEADER(std::string_view s) noexcept {
+    return s.find('[') != std::string::npos &&
+           s.find(']', s.find('[')) != std::string::npos;
+}
+
 NO_DISCARD std::stringstream read_file(std::string_view path) {
     std::ifstream f = open_file(path);
     return strip_comments(f);
 }
 
-bool parse_kv_value_as_bool(std::string_view s) {
-    s = remove_leading_and_trailing_whitespace(s);
+constexpr bool parse_kv_value_as_bool(std::string_view s) {
+    s = util::parse::remove_leading_and_trailing_whitespace(s);
     std::string v = to_lower(s);
     if (v == "true")
         return true;
     else if (v == "false")
         return false;
     else
-        throw std::invalid_argument(util::_format("parse_kv_value_as_bool(): value is invalid (v={}).", s));
+        throw std::invalid_argument(
+            util::format(
+                "parse_kv_value_as_bool(): value is invalid (v={}).", s));
 }
 
 std::size_t parse_kv_value_as_unsigned_int(const std::string& s) {
     std::string v = s;
-    v = remove_leading_and_trailing_whitespace(s);
-    if (STRING_HAS_SIGN_PREFIX(v)) {
+    v = util::parse::remove_leading_and_trailing_whitespace(s);
+    if (util::parse::STRING_HAS_SIGN_PREFIX(v)) {
         if (s.at(0) == '-')
-            throw std::invalid_argument("parse_kv_value_as_unsigned_int(): value is negative.");
+            throw std::invalid_argument(
+                "parse_kv_value_as_unsigned_int(): value is negative.");
     }
 
     try {
         return std::stoull(v, nullptr, 0);
     } catch (const std::invalid_argument& e) {
         throw std::invalid_argument(
-            util::_format("parse_kv_value_as_unsigned_int(): parse error: {}", e.what()));
+            util::format("parse_kv_value_as_unsigned_int(): parse error: {}",
+                          e.what()));
     }
 }
 
 std::intmax_t parse_kv_value_as_signed_int(const std::string& s) {
     std::string v = s;
-    v = remove_leading_and_trailing_whitespace(s);
+    v = util::parse::remove_leading_and_trailing_whitespace(s);
 
     try {
         return std::stoll(v, nullptr, 0);
     } catch (const std::invalid_argument& e) {
         throw std::invalid_argument(
-            util::_format("parse_kv_value_as_signed_int(): parse error: {}", e.what()));
+            util::format("parse_kv_value_as_signed_int(): parse error: {}",
+                         e.what()));
     }
 }
 
 long double parse_kv_value_as_float(const std::string& s) {
     std::string v = s;
-    v = remove_leading_and_trailing_whitespace(s);
+    v = util::parse::remove_leading_and_trailing_whitespace(s);
 
-    if (STRING_HAS_OCTAL_PREFIX_OR_POSTFIX(s))
-        throw std::invalid_argument("parse_kv_value_as_float(): can't parse octal value as float.");
+    if (util::parse::STRING_HAS_OCTAL_PREFIX_OR_POSTFIX(s))
+        throw std::invalid_argument(
+            "parse_kv_value_as_float(): can't parse octal value as float.");
 
     try {
         return std::stold(v, nullptr);
     } catch (const std::invalid_argument& e) {
         throw std::invalid_argument(
-            util::_format("parse_kv_value_as_float(): parse error: {}", e.what()));
+            util::format("parse_kv_value_as_float(): parse error: {}", 
+                         e.what()));
     }
 }
 
-std::string_view parse_kv_value_as_string(std::string_view s) {
-    s = remove_leading_and_trailing_whitespace(s);
+constexpr std::string_view parse_kv_value_as_string(std::string_view s) {
+    s = util::parse::remove_leading_and_trailing_whitespace(s);
     if (s.at(0) != '"')
         return s.substr(0, s.find_first_of(" \n"));
     
     std::size_t i = 0;
     while((i = s.find('"', i + 1)) != std::string::npos) {
         if (i == std::string::npos)
-            throw std::invalid_argument("parse_kv_value_as_string(): value has no non-escaped closing double-quote.");
+            throw std::invalid_argument(
+                "parse_kv_value_as_string(): value has no non-escaped closing double-quote.");
         else if (s.at(i - 1) != '\\')
             return s.substr(1, i - 1); // don't include quotes
     }
@@ -429,7 +349,8 @@ NO_DISCARD kv::pair parse_kv(const std::string& s) {
             "parse_kv: string does not contain a valid KV-pair");
 
     if (ERROR(KV_STRING_CONTAINS_INVALID_WHITESPACE(s)))
-        throw std::runtime_error("parse_kv: string contains invalid whitespace.");
+        throw std::runtime_error(
+            "parse_kv: string contains invalid whitespace.");
 
     const std::size_t delim_pos = s.find('=');
     const std::size_t key_begin = s.find_first_not_of(' ');
@@ -463,28 +384,33 @@ NO_DISCARD kv::pair parse_kv(const std::string& s) {
         util::dlog("val is not bool (v=\"{}\", e={}).", v, e.what());
     }
 
-    try {
-        std::size_t i = parse_kv_value_as_unsigned_int(v);
-        kv.val = i;
-        return kv;
-    } catch (const std::invalid_argument& e) {
-        util::dlog("val is not unsigned int (v=\"{}\", e={}).", v, e.what());
-    }
+    if (!util::parse::STRING_IS_FLOAT(v)) {
+        try {
+            std::size_t i = parse_kv_value_as_unsigned_int(v);
+            kv.val = i;
+            return kv;
+        } catch (const std::invalid_argument& e) {
+            util::dlog(
+                "val is not unsigned int (v=\"{}\", e={}).", 
+                v, 
+                e.what());
+        }
 
-    try {
-        std::intmax_t i = parse_kv_value_as_signed_int(v);
-        kv.val = i;
-        return kv;
-    } catch (const std::invalid_argument& e) {
-        util::dlog("val is not signed int (v=\"{}\", e={}).", v, e.what());
-    }
-
-    try {
-        long double f = parse_kv_value_as_float(v);
-        kv.val = f;
-        return kv;
-    } catch (const std::invalid_argument& e) {
-        util::dlog("val is not float (v=\"{}\", e={}).", v, e.what());
+        try {
+            std::intmax_t i = parse_kv_value_as_signed_int(v);
+            kv.val = i;
+            return kv;
+        } catch (const std::invalid_argument& e) {
+            util::dlog("val is not signed int (v=\"{}\", e={}).", v, e.what());
+        }
+    } else {
+        try {
+            long double f = parse_kv_value_as_float(v);
+            kv.val = f;
+            return kv;
+        } catch (const std::invalid_argument& e) {
+            util::dlog("val is not float (v=\"{}\", e={}).", v, e.what());
+        }
     }
 
     try {
@@ -495,7 +421,8 @@ NO_DISCARD kv::pair parse_kv(const std::string& s) {
         util::dlog("val is not valid string (v=\"{}\", e={}).", v, e.what());
     }
 
-    throw std::invalid_argument(util::_format("val did not match to a known type (v=\"{}\").", v));
+    throw std::invalid_argument(
+        util::format("val did not match to a known type (v=\"{}\").", v));
 }
 
 NO_DISCARD section parse_global_kvs(std::stringstream& ss) {
@@ -520,7 +447,11 @@ NO_DISCARD section parse_global_kvs(std::stringstream& ss) {
         try {
             p = parse_kv(s);
         } catch (const std::invalid_argument& e) {
-            util::dlog("parse_global_kvs: encountered invalid kv, skipping (s={}, e={}).", s, e.what());
+            util::dlog(
+                "parse_global_kvs: encountered invalid kv, skipping (s={}, e={}).",
+                s, 
+                e.what());
+
             continue;
         }
 
@@ -530,6 +461,15 @@ NO_DISCARD section parse_global_kvs(std::stringstream& ss) {
 }
 
 int main(int argc, char** argv) {
+    if (argv[argc] != nullptr)
+        return -1;
+
+    if (argc == 0)
+        return -2;
+
+    if (argv[0] == nullptr)
+        return -3;
+
     try {
         std::string_view s = argc > 1 && argv[1] != nullptr ?
             argv[1] :
@@ -544,6 +484,6 @@ int main(int argc, char** argv) {
         util::log("Done.");
     } catch (const std::exception& e) {
         util::log("main: uncaught exception: {}", e.what());
-        return -1;
+        return -5;
     }
 }
