@@ -2,3 +2,4 @@
 **/build
 **/*.conf
 **/.vs
+**/CMakeSettings.json
