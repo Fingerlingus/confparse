@@ -1,5 +1,4 @@
 **/out
 **/build
-**/*.conf
 **/.vs
 **/CMakeSettings.json
