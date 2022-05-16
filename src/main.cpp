@@ -44,14 +44,14 @@ namespace kv {
 struct value {
     using self_type = value;
 
-    constexpr value() 
+    value() 
         : type(KV_PAIR_VALUE::ERR),
           v(-1LL)
     {
           
     }
 
-    constexpr ~value() {
+    ~value() {
 
     }
 
@@ -104,7 +104,7 @@ struct value {
         constexpr ~value_union() { }
     } v;
     // non-trivial types declared separately
-    std::string s;
+    std::string_view s;
     std::vector<self_type> a;
 };
 
@@ -116,6 +116,7 @@ struct pair {
     pair() = default;
     pair(const self_type&) = default;
     pair(self_type&&) = default;
+    ~pair() = default;
 
     self_type& operator=(const self_type&) = default;
     self_type& operator=(self_type&&) = default;
@@ -266,7 +267,7 @@ NO_DISCARD std::stringstream read_file(std::string_view path) {
     return strip_comments(f);
 }
 
-constexpr bool parse_kv_value_as_bool(std::string_view s) {
+bool parse_kv_value_as_bool(std::string_view s) {
     s = util::parse::remove_leading_and_trailing_whitespace(s);
     std::string v = to_lower(s);
     if (v == "true")

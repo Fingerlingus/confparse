@@ -137,12 +137,10 @@ remove_leading_and_trailing_whitespace(std::string_view s) {
                     last_nonwhitespace - first_nonwhitespace + 1);
 }
 
-NO_DISCARD constexpr std::string 
+NO_DISCARD constexpr std::string_view 
 remove_leading_and_trailing_whitespace(const std::string& s) {
-    const std::size_t first_nonwhitespace = s.find_first_not_of(" \n");
-    const std::size_t last_nonwhitespace = s.find_last_not_of(" \n");
-    return s.substr(first_nonwhitespace, 
-                    last_nonwhitespace - first_nonwhitespace + 1);
+    std::string_view v = s;
+    return remove_leading_and_trailing_whitespace(v);
 }
 
 NO_DISCARD constexpr std::string_view 
@@ -296,7 +294,7 @@ template<std::integral T> NO_DISCARD constexpr bool ERROR(T i) noexcept {
     return i != 0;
 }
 
-NO_DISCARD constexpr std::string to_lower(std::string_view s) {
+NO_DISCARD std::string to_lower(std::string_view s) {
     std::string l = "";
     for (const auto c : s)
         l += static_cast<decltype(l)::value_type>(std::tolower(c));
